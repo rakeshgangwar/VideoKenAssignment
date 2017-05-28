@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">VideoKen Assignment</string>
+    <string name="microphone">Microphone</string>
+    <string name="video_url">Video URL</string>
+    <string name="clear_all">Clear All</string>
+    <string name="video_notes">Video Notes</string>
+    <string name="show_video_notes">Show Video Notes</string>
+    <string name="show_all_notes">Show All Notes</string>
+    <string name="delete_all_notes">Delete All Notes</string>
+    <string name="record_note">Record Note</string>
+</resources>
