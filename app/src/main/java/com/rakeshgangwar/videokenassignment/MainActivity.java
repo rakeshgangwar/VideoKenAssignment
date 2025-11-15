@@ -28,18 +28,58 @@ import java.util.regex.Pattern;
 import io.realm.Realm;
 import io.realm.RealmResults;
 
+/**
+ * MainActivity is the primary activity for the VideoKen Assignment application.
+ * It provides functionality to:
+ * - Play YouTube videos from user-provided URLs
+ * - Record voice notes with timestamps while watching videos
+ * - Store notes in a Realm database
+ * - Display and manage recorded notes
+ * - Navigate to specific video timestamps by clicking notes
+ *
+ * This activity extends YouTubeBaseActivity to support embedded YouTube playback
+ * and implements OnInitializedListener for YouTube player initialization callbacks.
+ *
+ * @author Rakesh Gangwar
+ * @version 1.0
+ */
 public class MainActivity extends YouTubeBaseActivity implements YouTubePlayer.OnInitializedListener {
 
+    /** Request code for YouTube player recovery dialog */
     private static final int RECOVERY_DIALOG_REQUEST = 1;
+
+    /** Request code for speech recognition intent */
     private final int SPEECH_RECOGNITION_CODE = 2;
+
+    /** YouTube player view component that displays videos */
     private YouTubePlayerView playerView;
+
+    /** YouTube player instance for controlling video playback */
     private YouTubePlayer player;
+
+    /** EditText field for entering YouTube video URLs */
     private EditText videoUrl;
+
+    /** Realm database instance for storing and querying notes */
     private Realm realm;
+
+    /** ListView for displaying recorded notes */
     private ListView notesList;
+
+    /** Adapter that binds Realm data to the ListView */
     private MyListAdapter notesListAdapter;
+
+    /** Current query results from Realm database */
     private RealmResults<AudioNotesObject> realmResults;
 
+    /**
+     * Called when the activity is first created.
+     * Initializes the UI components, Realm database, YouTube player, and event listeners.
+     *
+     * @param savedInstanceState If the activity is being re-initialized after previously being
+     *                          shut down, this Bundle contains the data it most recently
+     *                          supplied in onSaveInstanceState(Bundle). Otherwise it is null.
+     */
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -86,12 +126,26 @@ public class MainActivity extends YouTubeBaseActivity implements YouTubePlayer.O
 
     }
 
-
+    /**
+     * Callback invoked when YouTube player is successfully initialized.
+     * Stores the player instance for later use in controlling video playback.
+     *
+     * @param provider The provider that initialized the player
+     * @param youTubePlayer The initialized YouTube player instance
+     * @param wasRestored Whether the player was restored from a previous state
+     */
     @Override
-    public void onInitializationSuccess(YouTubePlayer.Provider provider, YouTubePlayer youTubePlayer, boolean b) {
-        this.player=youTubePlayer;
+    public void onInitializationSuccess(YouTubePlayer.Provider provider, YouTubePlayer youTubePlayer, boolean wasRestored) {
+        this.player = youTubePlayer;
     }
 
+    /**
+     * Callback invoked when YouTube player initialization fails.
+     * Shows an error dialog if the error is user-recoverable, otherwise displays a toast message.
+     *
+     * @param provider The provider that attempted initialization
+     * @param youTubeInitializationResult The result containing error information
+     */
     @Override
     public void onInitializationFailure(YouTubePlayer.Provider provider, YouTubeInitializationResult youTubeInitializationResult) {
         if (youTubeInitializationResult.isUserRecoverableError()) {
@@ -102,7 +156,15 @@ public class MainActivity extends YouTubeBaseActivity implements YouTubePlayer.O
         }
     }
 
-    public void takeAudioNote(View v){
+    /**
+     * Initiates speech recognition to record an audio note.
+     * Launches Android's speech recognizer to convert spoken words to text.
+     * The recognized text is then saved to the database with the current video timestamp.
+     * This method is called when the "Record Note" button is clicked.
+     *
+     * @param v The view that was clicked (Record Note button)
+     */
+    public void takeAudioNote(View v) {
         if(!videoUrl.getText().toString().equals("")){
             Intent intent=new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
             intent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
@@ -119,7 +181,14 @@ public class MainActivity extends YouTubeBaseActivity implements YouTubePlayer.O
         }
     }
 
-    public void clearEverything(View v){
+    /**
+     * Deletes all notes from the Realm database.
+     * This method is called when the "Delete All Notes" button is clicked.
+     * Warning: This action cannot be undone.
+     *
+     * @param v The view that was clicked (Delete All Notes button)
+     */
+    public void clearEverything(View v) {
         realm.executeTransaction(new Realm.Transaction() {
             @Override
             public void execute(Realm realm) {
@@ -128,18 +197,41 @@ public class MainActivity extends YouTubeBaseActivity implements YouTubePlayer.O
         });
     }
 
-    public void showAllNotes(View v){
+    /**
+     * Displays all notes from all videos in the notes list.
+     * Updates the ListView to show notes across all recorded videos, not just the current one.
+     * This method is called when the "Show All Notes" button is clicked.
+     *
+     * @param v The view that was clicked (Show All Notes button)
+     */
+    public void showAllNotes(View v) {
         realmResults=realm.where(AudioNotesObject.class).findAll();
         notesListAdapter=new MyListAdapter(realmResults);
         notesList.setAdapter(notesListAdapter);
     }
 
-    public void showVideoNotes(View v){
+    /**
+     * Displays only notes for the currently loaded video.
+     * Filters the notes list to show only notes associated with the video ID
+     * extracted from the URL field. This method is called when the "Show Video Notes" button is clicked.
+     *
+     * @param v The view that was clicked (Show Video Notes button)
+     */
+    public void showVideoNotes(View v) {
         realmResults=realm.where(AudioNotesObject.class).equalTo("videoId",extractYTId(videoUrl.getText().toString())).findAll();
         notesListAdapter=new MyListAdapter(realmResults);
         notesList.setAdapter(notesListAdapter);
     }
 
+    /**
+     * Handles results from launched activities, specifically speech recognition results.
+     * When speech recognition completes successfully, creates a new AudioNotesObject
+     * with the recognized text, current video ID, and video timestamp.
+     *
+     * @param requestCode The request code passed to startActivityForResult()
+     * @param resultCode The result code returned by the child activity
+     * @param data An Intent containing result data
+     */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -163,6 +255,19 @@ public class MainActivity extends YouTubeBaseActivity implements YouTubePlayer.O
         }
     }
 
+    /**
+     * Extracts the YouTube video ID from various YouTube URL formats.
+     * Supports multiple URL patterns including:
+     * - https://www.youtube.com/watch?v=VIDEO_ID
+     * - https://youtu.be/VIDEO_ID
+     * - https://www.youtube.com/embed/VIDEO_ID
+     * - https://www.youtube.com/v/VIDEO_ID
+     *
+     * Uses regex pattern matching to handle different URL structures.
+     *
+     * @param ytUrl The YouTube URL to parse
+     * @return The extracted video ID, or null if the URL format is not recognized
+     */
     public static String extractYTId(String ytUrl) {
         String vId = null;
         Pattern pattern = Pattern.compile(
@@ -175,6 +280,14 @@ public class MainActivity extends YouTubeBaseActivity implements YouTubePlayer.O
         return vId;
     }
 
+    /**
+     * Called when the activity is being destroyed.
+     * Performs cleanup operations including:
+     * - Closing the Realm database instance to prevent memory leaks
+     * - Releasing the YouTube player resources
+     *
+     * It's critical to close Realm and release the player to free up system resources.
+     */
     @Override
     protected void onDestroy() {
         super.onDestroy();
